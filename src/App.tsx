@@ -3,6 +3,7 @@ import { Home } from './pages/Home';
 import { Record } from './pages/Record';
 import { Playback } from './pages/Playback';
 import { ROOT_FOLDER } from './db';
+import { useEdgeSwipeBack } from './useSwipeBack';
 
 export type Route =
   | { page: 'home'; folderId: string }
@@ -11,6 +12,7 @@ export type Route =
 
 export function App() {
   const [route, setRoute] = useState<Route>({ page: 'home', folderId: ROOT_FOLDER });
+  useEdgeSwipeBack();
 
   switch (route.page) {
     case 'home':

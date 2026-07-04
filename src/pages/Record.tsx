@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SceneRecorder } from '../audio/recorder';
 import { createScene } from '../db';
 import { HoldButton } from '../components/HoldButton';
 import { useWakeLock } from '../useWakeLock';
 import { defaultSceneName, formatClock } from '../format';
+import { useBackHandler } from '../useSwipeBack';
 import type { Route } from '../App';
 
 interface Props {
@@ -72,12 +73,13 @@ export function Record({ folderId, navigate }: Props) {
     navigate({ page: 'scene', sceneId: scene.id, folderId });
   };
 
-  const discard = () => {
-    if (phase === 'recording' && !window.confirm('Discard this recording?')) return;
+  const discard = useCallback(() => {
+    if (recorderRef.current && !window.confirm('Discard this recording?')) return;
     recorderRef.current?.cancel();
     recorderRef.current = null;
     navigate({ page: 'home', folderId });
-  };
+  }, [navigate, folderId]);
+  useBackHandler(discard);
 
   return (
     <div className="page">

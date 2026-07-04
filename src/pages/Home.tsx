@@ -9,8 +9,10 @@ import {
   renameScene,
   deleteScene
 } from '../db';
+import { useCallback } from 'react';
 import type { Route } from '../App';
 import { formatClock } from '../format';
+import { useBackHandler } from '../useSwipeBack';
 
 interface Props {
   folderId: string;
@@ -32,6 +34,12 @@ export function Home({ folderId, navigate }: Props) {
     () => db.scenes.where('folderId').equals(folderId).sortBy('createdAt'),
     [folderId]
   );
+  const goToRoot = useCallback(
+    () => navigate({ page: 'home', folderId: ROOT_FOLDER }),
+    [navigate]
+  );
+  useBackHandler(atRoot ? null : goToRoot);
+
   const sceneCounts = useLiveQuery(async () => {
     if (!atRoot) return {};
     const counts: Record<string, number> = {};

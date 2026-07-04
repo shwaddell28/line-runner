@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import {
@@ -9,6 +9,7 @@ import {
 } from '../audio/player';
 import { Timeline } from '../components/Timeline';
 import { useWakeLock } from '../useWakeLock';
+import { useBackHandler } from '../useSwipeBack';
 import { formatClock } from '../format';
 import type { Route } from '../App';
 
@@ -33,6 +34,12 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
 
   const active = state.status === 'playing' || state.status === 'gap';
   useWakeLock(active);
+
+  const goBack = useCallback(
+    () => navigate({ page: 'home', folderId }),
+    [navigate, folderId]
+  );
+  useBackHandler(goBack);
 
   useEffect(() => {
     if (!scene) return;
