@@ -18,8 +18,8 @@ export default defineConfig({
         name: 'Line Runner',
         short_name: 'Lines',
         description: 'Record scenes and drill your lines',
-        theme_color: '#14141c',
-        background_color: '#14141c',
+        theme_color: '#110e0c',
+        background_color: '#110e0c',
         display: 'standalone',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

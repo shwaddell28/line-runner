@@ -22,6 +22,9 @@ export class SceneRecorder {
   private chunks: Blob[] = [];
   private startedAt = 0;
   private openStart: number | null = null;
+  private audioCtx: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private samples: Float32Array<ArrayBuffer> | null = null;
   readonly segments: LineSegment[] = [];
 
   get elapsed(): number {
@@ -32,8 +35,42 @@ export class SceneRecorder {
     return this.openStart !== null;
   }
 
+  /** Rough input loudness, 0–1, for a level meter (0 if unavailable). */
+  get level(): number {
+    if (!this.analyser || !this.samples) return 0;
+    this.analyser.getFloatTimeDomainData(this.samples);
+    let sum = 0;
+    for (const v of this.samples) sum += v * v;
+    const rms = Math.sqrt(sum / this.samples.length);
+    return Math.min(1, rms * 5);
+  }
+
   async start(): Promise<void> {
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Create the context before awaiting so it's still inside the tap gesture
+    // (iOS won't start a suspended one later). The meter is best-effort.
+    try {
+      this.audioCtx = new AudioContext();
+    } catch {
+      this.audioCtx = null;
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      this.releaseStream();
+      throw e;
+    }
+    if (this.audioCtx) {
+      try {
+        const source = this.audioCtx.createMediaStreamSource(this.stream);
+        this.analyser = this.audioCtx.createAnalyser();
+        this.analyser.fftSize = 1024;
+        this.samples = new Float32Array(this.analyser.fftSize);
+        source.connect(this.analyser);
+        void this.audioCtx.resume();
+      } catch {
+        this.analyser = null;
+      }
+    }
     const mimeType = pickMimeType();
     this.recorder = new MediaRecorder(this.stream, mimeType ? { mimeType } : undefined);
     this.recorder.ondataavailable = (e) => {
@@ -89,5 +126,8 @@ export class SceneRecorder {
   private releaseStream(): void {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
+    void this.audioCtx?.close().catch(() => {});
+    this.audioCtx = null;
+    this.analyser = null;
   }
 }

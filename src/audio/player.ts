@@ -1,27 +1,15 @@
 import type { LineSegment } from '../db';
 
-export type PlaybackMode = 'raw' | 'gapsRepeat' | 'fastGapsRepeat' | 'fastGaps';
+/** What happens at each of your lines. */
+export type LineHandling = 'play' | 'gap' | 'gapReplay';
+
+export interface PlaybackOptions {
+  lines: LineHandling;
+  /** play recorded audio at FAST_RATE instead of 1× (gaps stay full length) */
+  fast: boolean;
+}
 
 export const FAST_RATE = 1.75;
-
-export const MODE_INFO: Record<PlaybackMode, { label: string; description: string }> = {
-  raw: {
-    label: 'Raw',
-    description: 'The whole recording, straight through'
-  },
-  gapsRepeat: {
-    label: 'Gaps',
-    description: 'Silent gap to say your line, then hear it played back'
-  },
-  fastGapsRepeat: {
-    label: 'Fast + R',
-    description: `Other lines at ${FAST_RATE}×, full-length gap, then your line plays back`
-  },
-  fastGaps: {
-    label: 'Fast',
-    description: `Other lines at ${FAST_RATE}×, gap for your line, no repeat`
-  }
-};
 
 export interface AudioChunk {
   kind: 'audio';
@@ -62,13 +50,13 @@ export function normalizeSegments(segments: LineSegment[], duration: number): Li
 export function buildSchedule(
   duration: number,
   segments: LineSegment[],
-  mode: PlaybackMode
+  options: PlaybackOptions
 ): Chunk[] {
-  if (mode === 'raw') {
-    return duration > 0 ? [{ kind: 'audio', from: 0, to: duration, rate: 1, isMyLine: false }] : [];
+  const rate = options.fast ? FAST_RATE : 1;
+  if (options.lines === 'play') {
+    return duration > 0 ? [{ kind: 'audio', from: 0, to: duration, rate, isMyLine: false }] : [];
   }
-  const rate = mode === 'gapsRepeat' ? 1 : FAST_RATE;
-  const repeat = mode !== 'fastGaps';
+  const repeat = options.lines === 'gapReplay';
   const chunks: Chunk[] = [];
   let cursor = 0;
   for (const seg of normalizeSegments(segments, duration)) {
@@ -140,12 +128,12 @@ export class ScenePlayer {
     this.url = URL.createObjectURL(blob);
     this.audio = getSharedAudio();
     this.audio.src = this.url;
-    this.setMode('raw');
+    this.setOptions({ lines: 'play', fast: false });
   }
 
-  setMode(mode: PlaybackMode): void {
+  setOptions(options: PlaybackOptions): void {
     this.stop();
-    this.schedule = buildSchedule(this.duration, this.segments, mode);
+    this.schedule = buildSchedule(this.duration, this.segments, options);
   }
 
   play(): void {

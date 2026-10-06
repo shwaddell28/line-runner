@@ -9,10 +9,12 @@ import {
   renameScene,
   deleteScene
 } from '../db';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { Route } from '../App';
 import { formatClock } from '../format';
 import { useBackHandler } from '../useSwipeBack';
+import { Icon } from '../components/Icon';
+import { SwipeRow } from '../components/SwipeRow';
 
 interface Props {
   folderId: string;
@@ -39,6 +41,12 @@ export function Home({ folderId, navigate }: Props) {
     [navigate]
   );
   useBackHandler(atRoot ? null : goToRoot);
+  // Only one row's Edit/Delete is revealed at a time.
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const rowOpenProps = (id: string) => ({
+    open: openRow === id,
+    onOpenChange: (open: boolean) => setOpenRow((cur) => (open ? id : cur === id ? null : cur))
+  });
 
   const sceneCounts = useLiveQuery(async () => {
     if (!atRoot) return {};
@@ -77,29 +85,29 @@ export function Home({ folderId, navigate }: Props) {
 
   const loading = scenes === undefined || folders === undefined;
   const empty = !loading && scenes.length === 0 && folders.length === 0;
+  const showSectionLabels = atRoot && !!folders?.length && !!scenes?.length;
 
   return (
     <div className="page">
       <header className="page-header">
         {!atRoot && (
-          <button
-            className="icon-btn"
-            onClick={() => navigate({ page: 'home', folderId: ROOT_FOLDER })}
-            aria-label="Back"
-          >
-            ‹
+          <button className="icon-btn" onClick={goToRoot} aria-label="Back">
+            <Icon name="back" />
           </button>
         )}
-        <h1>{atRoot ? 'Line Runner' : (folder?.name ?? '')}</h1>
+        <div className="title-stack">
+          {!atRoot && <span className="title-eyebrow">Folder</span>}
+          <h1>{atRoot ? 'Line Runner' : (folder?.name ?? '')}</h1>
+        </div>
       </header>
 
       <div className="toolbar">
         <button className="btn primary" onClick={() => navigate({ page: 'record', folderId })}>
-          ＋ New Scene
+          <Icon name="plus" /> New Scene
         </button>
         {atRoot && (
           <button className="btn" onClick={onNewFolder}>
-            📁 New Folder
+            <Icon name="folderPlus" /> New Folder
           </button>
         )}
       </div>
@@ -111,64 +119,91 @@ export function Home({ folderId, navigate }: Props) {
         </p>
       )}
 
-      <ul className="item-list">
-        {folders?.map((f) => (
-          <li key={f.id} className="item-row">
-            <button
-              className="item-main"
-              onClick={() => navigate({ page: 'home', folderId: f.id })}
-            >
-              <span className="item-name">📁 {f.name}</span>
-              <span className="item-sub">
-                {sceneCounts?.[f.id] ?? 0} scene{(sceneCounts?.[f.id] ?? 0) === 1 ? '' : 's'}
-              </span>
-            </button>
-            <button
-              className="icon-btn"
-              onClick={() => onRenameFolder(f.id, f.name)}
-              aria-label={`Rename ${f.name}`}
-            >
-              ✎
-            </button>
-            <button
-              className="icon-btn danger"
-              onClick={() => onDeleteFolder(f.id, f.name, sceneCounts?.[f.id] ?? 0)}
-              aria-label={`Delete ${f.name}`}
-            >
-              🗑
-            </button>
-          </li>
-        ))}
-        {scenes?.map((s) => (
-          <li key={s.id} className="item-row">
-            <button
-              className="item-main"
-              onClick={() => navigate({ page: 'scene', sceneId: s.id, folderId })}
-            >
-              <span className="item-name">🎬 {s.name}</span>
-              <span className="item-sub">
-                {formatClock(s.duration)} · {s.segments.length} line
-                {s.segments.length === 1 ? '' : 's'} ·{' '}
-                {new Date(s.createdAt).toLocaleDateString()}
-              </span>
-            </button>
-            <button
-              className="icon-btn"
-              onClick={() => onRenameScene(s.id, s.name)}
-              aria-label={`Rename ${s.name}`}
-            >
-              ✎
-            </button>
-            <button
-              className="icon-btn danger"
-              onClick={() => onDeleteScene(s.id, s.name)}
-              aria-label={`Delete ${s.name}`}
-            >
-              🗑
-            </button>
-          </li>
-        ))}
-      </ul>
+      {!!folders?.length && (
+        <section className="list-section">
+          {showSectionLabels && <h2 className="section-label">Folders</h2>}
+          <ul className="item-list">
+            {folders.map((f) => {
+              const count = sceneCounts?.[f.id] ?? 0;
+              return (
+                <SwipeRow
+                  key={f.id}
+                  name={f.name}
+                  {...rowOpenProps(f.id)}
+                  onSelect={() => navigate({ page: 'home', folderId: f.id })}
+                  onEdit={() => {
+                    setOpenRow(null);
+                    void onRenameFolder(f.id, f.name);
+                  }}
+                  onDelete={() => {
+                    setOpenRow(null);
+                    void onDeleteFolder(f.id, f.name, count);
+                  }}
+                >
+                  <span className="item-icon">
+                    <Icon name="folder" />
+                  </span>
+                  <span className="item-text">
+                    <span className="item-name">{f.name}</span>
+                    <span className="item-sub">
+                      {count} scene{count === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                  <span className="item-chevron">
+                    <Icon name="forward" />
+                  </span>
+                </SwipeRow>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {!!scenes?.length && (
+        <section className="list-section">
+          {showSectionLabels && <h2 className="section-label">Scenes</h2>}
+          <ul className="item-list">
+            {scenes.map((s) => (
+              <SwipeRow
+                key={s.id}
+                name={s.name}
+                {...rowOpenProps(s.id)}
+                onSelect={() => navigate({ page: 'scene', sceneId: s.id, folderId })}
+                onEdit={() => {
+                  setOpenRow(null);
+                  void onRenameScene(s.id, s.name);
+                }}
+                onDelete={() => {
+                  setOpenRow(null);
+                  void onDeleteScene(s.id, s.name);
+                }}
+              >
+                <span className="item-icon scene">
+                  <Icon name="play" />
+                </span>
+                <span className="item-text">
+                  <span className="item-name">{s.name}</span>
+                  <span className="item-sub">
+                    {formatClock(s.duration)} · {s.segments.length} line
+                    {s.segments.length === 1 ? '' : 's'} ·{' '}
+                    {new Date(s.createdAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </span>
+                <span className="item-chevron">
+                  <Icon name="forward" />
+                </span>
+              </SwipeRow>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {!loading && !empty && (
+        <p className="list-hint">Swipe a row left to rename or delete</p>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { Icon } from './Icon';
 
 interface Props {
   onHoldStart: () => void;
@@ -41,7 +42,18 @@ export function HoldButton({ onHoldStart, onHoldEnd, disabled }: Props) {
       onPointerCancel={end}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {held ? 'YOUR LINE — RECORDING MARK' : 'HOLD WHILE SPEAKING YOUR LINE'}
+      {held ? (
+        <>
+          <span className="hold-title">Your line</span>
+          <span className="hold-sub">Release when you’re done</span>
+        </>
+      ) : (
+        <>
+          <Icon name="mic" />
+          <span className="hold-title">Hold</span>
+          <span className="hold-sub">while you speak your line</span>
+        </>
+      )}
     </button>
   );
 }

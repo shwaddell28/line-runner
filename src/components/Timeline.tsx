@@ -20,14 +20,16 @@ export function Timeline({ duration, segments, position, onSeek }: Props) {
 
   return (
     <div className="timeline" onClick={handleClick} role="slider" aria-label="Playback position">
-      <div className="timeline-track" />
-      {segments.map((s, i) => (
-        <div
-          key={i}
-          className="timeline-segment"
-          style={{ left: pct(s.start), width: pct(s.end - s.start) }}
-        />
-      ))}
+      <div className="timeline-track">
+        <div className="timeline-played" style={{ width: pct(position) }} />
+        {segments.map((s, i) => (
+          <div
+            key={i}
+            className={`timeline-segment${position >= s.end ? ' done' : ''}`}
+            style={{ left: pct(s.start), width: pct(s.end - s.start) }}
+          />
+        ))}
+      </div>
       <div className="timeline-cursor" style={{ left: pct(position) }} />
     </div>
   );

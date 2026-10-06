@@ -9,15 +9,16 @@ modes that replace your lines with silent gaps.
 1. **Record** — on the New Scene screen, start recording and read the whole scene.
    Press and hold the yellow button for the duration of each of *your* lines,
    release for everyone else's.
-2. **Practice** — pick a playback mode:
-   - **Play raw** — the recording, straight through.
-   - **Gaps + repeat** — a silent gap where your line goes (say it!), then your
-     recorded line plays so you can check yourself.
-   - **Fast, gaps + repeat** — everyone else at 1.75× (pitch-preserved), the gap
-     stays full length so you can speak at normal pace, then your line plays at 1.75×.
-   - **Fast, gaps only** — others at 1.75×, a gap for your line, no repeat.
+2. **Practice** — pick how your lines are handled and the speed:
+   - **Your lines:** *Hear them* (the recording, straight through), *Gap* (a silent
+     gap where your line goes — say it!), or *Gap + replay* (the gap, then your
+     recorded line plays so you can check yourself).
+   - **Speed:** 1× or 1.75× (pitch-preserved). Gaps always stay full length so you
+     can speak at normal pace.
+   - **Auto-play next scene** runs through every scene in a folder in order.
 
-Scenes can be organized into folders from the landing page. Everything is stored
+Scenes can be organized into folders from the landing page; swipe a row left to
+rename or delete it. Everything is stored
 on-device (IndexedDB) — no accounts, no server, works offline once installed.
 
 ## Development
