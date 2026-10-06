@@ -20,11 +20,30 @@ interface Props {
 }
 
 const MODES: PlaybackMode[] = ['raw', 'gapsRepeat', 'fastGapsRepeat', 'fastGaps'];
+const MODE_KEY = 'line-runner:playbackMode';
+
+function loadMode(): PlaybackMode {
+  try {
+    const saved = localStorage.getItem(MODE_KEY);
+    if (saved && (MODES as string[]).includes(saved)) return saved as PlaybackMode;
+  } catch {
+    // Storage unavailable (e.g. private mode) — fall back to default.
+  }
+  return 'raw';
+}
+
+function saveMode(mode: PlaybackMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // Ignore — remembering the mode is best-effort.
+  }
+}
 
 export function Playback({ sceneId, folderId, navigate }: Props) {
   // undefined = still loading, null = scene missing/deleted
   const scene = useLiveQuery(async () => (await db.scenes.get(sceneId)) ?? null, [sceneId]);
-  const [mode, setMode] = useState<PlaybackMode>('raw');
+  const [mode, setMode] = useState<PlaybackMode>(loadMode);
   const [state, setState] = useState<PlayerState>({
     status: 'idle',
     position: 0,
@@ -44,6 +63,7 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
   useEffect(() => {
     if (!scene) return;
     const player = new ScenePlayer(scene.audioBlob, scene.duration, scene.segments, setState);
+    player.setMode(mode);
     playerRef.current = player;
     return () => {
       playerRef.current = null;
@@ -55,6 +75,7 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
 
   const selectMode = (m: PlaybackMode) => {
     setMode(m);
+    saveMode(m);
     playerRef.current?.setMode(m);
   };
 
