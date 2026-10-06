@@ -32,27 +32,50 @@ function loadMode(): PlaybackMode {
   return 'raw';
 }
 
-function saveMode(mode: PlaybackMode): void {
+const AUTO_NEXT_KEY = 'line-runner:autoNext';
+/** Pause on the "Up next" banner before the next scene starts. */
+const AUTO_NEXT_DELAY_MS = 2000;
+
+function loadAutoNext(): boolean {
   try {
-    localStorage.setItem(MODE_KEY, mode);
+    return localStorage.getItem(AUTO_NEXT_KEY) === '1';
   } catch {
-    // Ignore — remembering the mode is best-effort.
+    return false;
+  }
+}
+
+function savePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore — remembering preferences is best-effort.
   }
 }
 
 export function Playback({ sceneId, folderId, navigate }: Props) {
   // undefined = still loading, null = scene missing/deleted
   const scene = useLiveQuery(async () => (await db.scenes.get(sceneId)) ?? null, [sceneId]);
+  const folderScenes = useLiveQuery(
+    () => db.scenes.where('folderId').equals(folderId).sortBy('createdAt'),
+    [folderId]
+  );
   const [mode, setMode] = useState<PlaybackMode>(loadMode);
+  const [autoNext, setAutoNext] = useState(loadAutoNext);
   const [state, setState] = useState<PlayerState>({
     status: 'idle',
     position: 0,
     playingMyLine: false
   });
   const playerRef = useRef<ScenePlayer | null>(null);
+  // Set when auto-play navigates here, so the next scene starts on load.
+  const autoStartRef = useRef(false);
+
+  const currentIndex = folderScenes?.findIndex((s) => s.id === sceneId) ?? -1;
+  const nextScene = currentIndex >= 0 ? folderScenes?.[currentIndex + 1] : undefined;
 
   const active = state.status === 'playing' || state.status === 'gap';
-  useWakeLock(active);
+  const advancing = autoNext && state.status === 'ended' && nextScene !== undefined;
+  useWakeLock(active || advancing);
 
   const goBack = useCallback(
     () => navigate({ page: 'home', folderId }),
@@ -65,6 +88,10 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
     const player = new ScenePlayer(scene.audioBlob, scene.duration, scene.segments, setState);
     player.setMode(mode);
     playerRef.current = player;
+    if (autoStartRef.current) {
+      autoStartRef.current = false;
+      player.play();
+    }
     return () => {
       playerRef.current = null;
       player.destroy();
@@ -73,10 +100,26 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene?.id, scene?.audioBlob]);
 
+  useEffect(() => {
+    if (!advancing || !nextScene) return;
+    const timer = setTimeout(() => {
+      autoStartRef.current = true;
+      // Leave 'ended' now so this doesn't re-fire while the next scene loads.
+      playerRef.current?.stop();
+      navigate({ page: 'scene', sceneId: nextScene.id, folderId });
+    }, AUTO_NEXT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [advancing, nextScene, navigate, folderId]);
+
   const selectMode = (m: PlaybackMode) => {
     setMode(m);
-    saveMode(m);
+    savePref(MODE_KEY, m);
     playerRef.current?.setMode(m);
+  };
+
+  const toggleAutoNext = () => {
+    setAutoNext(!autoNext);
+    savePref(AUTO_NEXT_KEY, autoNext ? '0' : '1');
   };
 
   const togglePlay = () => {
@@ -131,6 +174,17 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
           ))}
         </div>
         <p className="mode-caption">{MODE_INFO[mode].description}</p>
+        <button
+          role="switch"
+          aria-checked={autoNext}
+          className={`auto-next${autoNext ? ' on' : ''}`}
+          onClick={toggleAutoNext}
+        >
+          <span className="auto-next-label">Auto-play next scene</span>
+          <span className="auto-next-track" aria-hidden="true">
+            <span className="auto-next-thumb" />
+          </span>
+        </button>
       </div>
 
       <div className={`now-banner${state.status === 'gap' ? ' your-turn' : ''}`}>
@@ -140,8 +194,12 @@ export function Playback({ sceneId, folderId, navigate }: Props) {
             ? '🔁 Your line, played back'
             : active
               ? 'Playing…'
-              : state.status === 'ended'
-                ? 'Finished'
+              : advancing
+                ? `Up next: ${nextScene.name}`
+                : state.status === 'ended'
+                  ? autoNext && folderScenes && folderScenes.length > 1
+                    ? 'Finished — end of folder'
+                    : 'Finished'
                 : 'Ready — press Play'}
       </div>
 

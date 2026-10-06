@@ -100,6 +100,24 @@ export interface PlayerState {
 /** How close (seconds of source time) to a chunk boundary counts as done. */
 const BOUNDARY_EPSILON = 0.03;
 
+/**
+ * One media element shared by every ScenePlayer. iOS only lets a media element
+ * start without a user gesture once that same element has been played from a
+ * tap, so reusing it is what lets auto-play advance to the next scene.
+ */
+let sharedAudio: HTMLAudioElement | null = null;
+
+function getSharedAudio(): HTMLAudioElement {
+  if (!sharedAudio) {
+    sharedAudio = new Audio();
+    sharedAudio.preload = 'auto';
+    sharedAudio.preservesPitch = true;
+    // Older iOS Safari uses the prefixed property.
+    (sharedAudio as unknown as Record<string, unknown>).webkitPreservesPitch = true;
+  }
+  return sharedAudio;
+}
+
 export class ScenePlayer {
   private audio: HTMLAudioElement;
   private url: string;
@@ -120,11 +138,8 @@ export class ScenePlayer {
     private onState: (state: PlayerState) => void
   ) {
     this.url = URL.createObjectURL(blob);
-    this.audio = new Audio(this.url);
-    this.audio.preload = 'auto';
-    this.audio.preservesPitch = true;
-    // Older iOS Safari uses the prefixed property.
-    (this.audio as unknown as Record<string, unknown>).webkitPreservesPitch = true;
+    this.audio = getSharedAudio();
+    this.audio.src = this.url;
     this.setMode('raw');
   }
 
@@ -199,7 +214,8 @@ export class ScenePlayer {
     clearTimeout(this.gapTimer);
     this.stopTicking();
     this.audio.pause();
-    this.audio.src = '';
+    this.audio.removeAttribute('src');
+    this.audio.load();
     URL.revokeObjectURL(this.url);
   }
 
